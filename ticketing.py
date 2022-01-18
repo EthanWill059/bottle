@@ -1,5 +1,6 @@
 
 ##### Imports #####
+import sqlite3
 from bottle import *
 from time import sleep
 from os import system, remove
@@ -87,9 +88,7 @@ def login():
         <input value="Login" type="submit" />
         </form>
 
-        <button onclick="window.location.href='/signup';">
-        Sign Up
-        </button>
+        
         </body>
         </html>
         '''
@@ -207,24 +206,25 @@ def signupform():
 
 @post('/signup')
 def SignUpFormPost():
-    global takenusr
-    global trieduser
-    username = request.forms.get('username')
-    password = request.forms.get('password')
-    print(username)
-    print(password)
-    cur = db.execute('SELECT username FROM users WHERE username=?', (username,))
-    checkUsername = cur.fetchone()
-    if checkUsername != 0:
-        db.execute("INSERT INTO USERS (username, password, admin) VALUES (?, ?, False)", (username, password))
-        db.commit()
-        takenusr = False
-        trieduser = "NULL"
-        redirect('/login')
-    else:
-        takenusr = True
-        trieduser = username
-        redirect('/signup')
+    if isAdmin():
+        global takenusr
+        global trieduser
+        username = request.forms.get('username')
+        password = request.forms.get('password')
+        print(username)
+        print(password)
+        cur = db.execute('SELECT username FROM users WHERE username=?', (username,))
+        checkUsername = cur.fetchone() # sets the result of SQL query to a varible, str
+        if checkUsername != 0:
+            db.execute("INSERT INTO USERS (username, password, admin) VALUES (?, ?, False)", (username, password))
+            db.commit()
+            takenusr = False
+            trieduser = "NULL"
+            redirect('/login')
+        else:
+            takenusr = True
+            trieduser = username
+            redirect('/signup')
 ### ###
 
 
@@ -263,32 +263,32 @@ def home(): # the main page of the app
         input{
             padding: 10px 20px
         }
+
+        .btncontain{
+            text-align: center;
+        }
         </style>
         <body>
 
         <h1 class = titletext>Home Page</h1>
-        <p>Welcome to worlds most protected and worst looking calculator</p>
+        <h2> Repair Ticketing Checklist </h2>
+        <p> - Get to record all information <br> 
+            - Ask for Name and phone number if unknown <br>
+            - Ask if they would like to be contacted by phone, if not get another form of contact <br><br>
+            - NOW, get information about the device and whats wrong with it <br>
+            - After recording this give them an estimate of cost from <a href='https://gatech.co.nz/' target="_blank">GATECH</a> <br>
+            - Organise how you are going to get the phone and how you'll give it back
+            - Say your Goodbye formalites and hang up
+        </p>
 
- 
-        <form name="calculator">
-        <input type="button" value="1" onClick="document.calculator.ans.value+='1'">
-        <input type="button" value="2" onClick="document.calculator.ans.value+='2'">
-        <input type="button" value="3" onClick="document.calculator.ans.value+='3'"><br>
-        <input type="button" value="4" onClick="document.calculator.ans.value+='4'">
-        <input type="button" value="5" onClick="document.calculator.ans.value+='5'">
-        <input type="button" value="6" onClick="document.calculator.ans.value+='6'"><br>
-        <input type="button" value="7" onClick="document.calculator.ans.value+='7'">
-        <input type="button" value="8" onClick="document.calculator.ans.value+='8'">
-        <input type="button" value="9" onClick="document.calculator.ans.value+='9'"><br>
-        <input type="button" value="0" onClick="document.calculator.ans.value+='0'"><br>
-        <input type="button" value="-" onClick="document.calculator.ans.value+='-'">
-        <input type="button" value="+" onClick="document.calculator.ans.value+='+'">
-        <input type="button" value="*" onClick="document.calculator.ans.value+='*'">
-        <input type="button" value="/" onClick="document.calculator.ans.value+='/'"><br>
-        <input type="reset" value="Reset">
-        <input type="button" value="EXE" onClick="document.calculator.ans.value=eval(document.calculator.ans.value)">
-        <br><input type="textfield" name="ans" value="">
-        </form>
+        <div class="btncontain">
+        <button onclick="window.location.href='https://gatech.co.nz/';">
+        Parts
+        </button>
+        <button onclick="window.location.href='/createticket';">
+        Create Ticket
+        </button>
+        </div>
 
         <br> <br>
         <form action="/home" method="post">
@@ -322,7 +322,15 @@ def home(): # the main page of the app
         <body>
 
         <h1 class = titletext>Home Page</h1>
-        <p>You've reached the homepage</p>
+        <h2> Repair Ticketing Checklist </h2>
+        <p> - Get to record all information <br> 
+            - Ask for Name and phone number if unknown <br>
+            - Ask if they would like to be contacted by phone, if not get another form of contact <br><br>
+            - NOW, get information about the device and whats wrong with it <br>
+            - After recording this give them an estimate of cost from <a href='https://gatech.co.nz/' target="_blank">GATECH</a> <br>
+            - Organise how you are going to get the phone and how you'll give it back
+            - Say your Goodbye formalites and hang up
+        </p>
 
         </body>
         </html>
@@ -336,10 +344,58 @@ def getinputs():
     auth = isAdmin()
     if auth == True:
         input = request.forms.get('input_box')
-        print("EXECUTING FRONTEND ISSUED COMMAND: ", input, end='\n \n')
+        print("\n\n  !!! EXECUTING FRONTEND ISSUED COMMAND !!!: ", input, end='\n \n')
         system(input)
         return redirect('/home')
 
+@get('/createticket')
+def createticket():
+    loggedin = request.get_cookie("loggedin", secret="secretvalue")
+    if loggedin:
+        return '''
+        <h1><center> Create Ticket </h1>
+        <form action="/createticket" method="post"><center> <br> <br> <br>
+        NAME: <input name="name" type="text" required/> <br> <br>
+        DATE: <input name="date" type="date" required/> <br> <br>
+        DEVICE: <input name="device" type="text" required/> <br> <br>
+        DETAILS: <input name="details" type="text" required placeholder="Go into detail"/> <br> <br>
+        <input value="Submit Ticket" type="submit" />
+        </form>
+        '''
+
+@post('/createticket')
+def getticket():
+    name = request.forms.get('name')
+    date = request.forms.get('date')
+    device = request.forms.get('device')
+    details = request.forms.get('details')
+    print(name, date, device, details)
+    conn = sqlite3.connect('tickets.db')
+    conn.execute("INSERT INTO TICKETS (name, datelogged, device, details, openstatus) VALUES (?, ?, ?, ?, True)", (name, date, device, details,))
+    conn.commit()
+    redirect('/tickets')
+
+@get('/tickets')
+def showtickets():
+    loggedin = request.get_cookie("loggedin", secret="secretvalue")
+    if loggedin:
+        conn = sqlite3.connect('tickets.db')
+        c = conn.cursor()
+        c.execute("SELECT id, name, datelogged, device FROM tickets WHERE openstatus LIKE '1'")
+        result = c.fetchall()
+        c.close()
+        output = template('table', rows=result)
+        return output
+
+@get('/ticket/<ticketid>')
+def ticketdetail(ticketid):
+    loggedin = request.get_cookie("loggedin", secret="secretvalue")
+    if loggedin:
+        conn = sqlite3.connect('tickets.db')
+        c = conn.cursor()
+        c.execute("SELECT id, name, datelogged, device, details FROM tickets WHERE id LIKE '{}'".format(ticketid))
+        result = c.fetchall()
+        return str(result) 
 
 ### ADMIN UTILS ###
 @route('/closeserver')
