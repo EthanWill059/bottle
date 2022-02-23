@@ -6,6 +6,7 @@ from time import sleep
 from os import system, remove
 from sqlite3 import *
 from random import randint
+import re
 ###################
 
 # setup for server
@@ -13,11 +14,6 @@ app = Bottle()
 ##
 
 ## Database
-def connectdb(): # for reuse
-    print('Attemping to connect to Database...')
-    global db
-    db = connect('users.db')
-connectdb()
 
 
 
@@ -25,8 +21,10 @@ connectdb()
 
 def check_login(name, passw): # confirms the password
     try:
+        db = connect('users.db')
         cur = db.execute("SELECT password FROM USERS WHERE username = ?", (name,))
         row = cur.fetchone()
+        db.close()
         if row[0] == passw:
             return True
         else:
@@ -35,8 +33,10 @@ def check_login(name, passw): # confirms the password
         return False
 
 def authAdmin(name):
+    db = connect('users.db')
     cur = db.execute("SELECT admin FROM USERS WHERE username = ?", (name,))
     row = cur.fetchone()
+    db.close()
     if row[0] == True:
         return True
     else:
@@ -207,6 +207,7 @@ def signupform():
 @post('/signup')
 def SignUpFormPost():
     if isAdmin():
+        db = connect('users.db')
         global takenusr
         global trieduser
         username = request.forms.get('username')
@@ -224,6 +225,7 @@ def SignUpFormPost():
         else:
             takenusr = True
             trieduser = username
+            db.close()
             redirect('/signup')
 ### ###
 
@@ -277,7 +279,7 @@ def home(): # the main page of the app
             - Ask if they would like to be contacted by phone, if not get another form of contact <br><br>
             - NOW, get information about the device and whats wrong with it <br>
             - After recording this give them an estimate of cost from <a href='https://gatech.co.nz/' target="_blank">GATECH</a> <br>
-            - Organise how you are going to get the phone and how you'll give it back
+            - Organise how you are going to get the phone and how you'll give it back <br>
             - Say your Goodbye formalites and hang up
         </p>
 
@@ -287,6 +289,12 @@ def home(): # the main page of the app
         </button>
         <button onclick="window.location.href='/createticket';">
         Create Ticket
+        </button>
+        <button onclick="window.location.href='/tickets';">
+        View Tickets
+        </button>
+        <button onclick="window.location.href='/signup';">
+        New User
         </button>
         </div>
 
@@ -318,6 +326,18 @@ def home(): # the main page of the app
             text-align: center; 
             color: darkblue;
         }
+
+        form{
+            text-align: center;   
+        }
+
+        input{
+            padding: 10px 20px
+        }
+
+        .btncontain{
+            text-align: center;
+        }
         </style>
         <body>
 
@@ -328,9 +348,21 @@ def home(): # the main page of the app
             - Ask if they would like to be contacted by phone, if not get another form of contact <br><br>
             - NOW, get information about the device and whats wrong with it <br>
             - After recording this give them an estimate of cost from <a href='https://gatech.co.nz/' target="_blank">GATECH</a> <br>
-            - Organise how you are going to get the phone and how you'll give it back
+            - Organise how you are going to get the phone and how you'll give it back <br>
             - Say your Goodbye formalites and hang up
         </p>
+
+        <div class="btncontain">
+        <button onclick="window.location.href='https://gatech.co.nz/';">
+        Parts
+        </button>
+        <button onclick="window.location.href='/createticket';">
+        Create Ticket
+        </button>
+        <button onclick="window.location.href='/tickets';">
+        View Tickets
+        </button>
+        </div>
 
         </body>
         </html>
@@ -348,14 +380,31 @@ def getinputs():
         system(input)
         return redirect('/home')
 
+
+
+####### TICKETS ##########
 @get('/createticket')
 def createticket():
     loggedin = request.get_cookie("loggedin", secret="secretvalue")
     if loggedin:
         return '''
+        <style>
+        body {
+            background-color: lightblue;
+        } 
+        h1 {
+            color: navy;
+            margin-left: 20px;
+        }
+        .titletext {
+            text-align: center; 
+            color: darkblue;
+        }
+        </style>
         <h1><center> Create Ticket </h1>
         <form action="/createticket" method="post"><center> <br> <br> <br>
         NAME: <input name="name" type="text" required/> <br> <br>
+        PHONE:  <input name="phone" type="text" required/> <br> <br>
         DATE: <input name="date" type="date" required/> <br> <br>
         DEVICE: <input name="device" type="text" required/> <br> <br>
         DETAILS: <input name="details" type="text" required placeholder="Go into detail"/> <br> <br>
@@ -366,12 +415,13 @@ def createticket():
 @post('/createticket')
 def getticket():
     name = request.forms.get('name')
+    phone = request.forms.get('phone')
     date = request.forms.get('date')
     device = request.forms.get('device')
     details = request.forms.get('details')
-    print(name, date, device, details)
+    print(phone)
     conn = sqlite3.connect('tickets.db')
-    conn.execute("INSERT INTO TICKETS (name, datelogged, device, details, openstatus) VALUES (?, ?, ?, ?, True)", (name, date, device, details,))
+    conn.execute("INSERT INTO TICKETS (name, phoneno, datelogged, device, details, openstatus) VALUES (?, ?, ?, ?, ?, True)", (name, phone, date, device, details,))
     conn.commit()
     redirect('/tickets')
 
@@ -381,10 +431,17 @@ def showtickets():
     if loggedin:
         conn = sqlite3.connect('tickets.db')
         c = conn.cursor()
-        c.execute("SELECT id, name, datelogged, device FROM tickets WHERE openstatus LIKE '1'")
+        c.execute("SELECT id, name, phoneno, datelogged, device FROM tickets WHERE openstatus LIKE '1'")
         result = c.fetchall()
+        c.execute("SELECT id FROM tickets WHERE openstatus LIKE '1'")
+        openids = c.fetchall()
+        listToStr = ' '.join(map(str, openids)) #temporary string obj for removing the Brackets from sql output for display.
+        print(listToStr)
+        listToStr.replace("(),", "")
+        listToStr.split()
+        print(openids)
         c.close()
-        output = template('table', rows=result)
+        output = template('table', rows=result, ids=openids)
         return output
 
 @get('/ticket/<ticketid>')
@@ -393,10 +450,43 @@ def ticketdetail(ticketid):
     if loggedin:
         conn = sqlite3.connect('tickets.db')
         c = conn.cursor()
-        c.execute("SELECT id, name, datelogged, device, details FROM tickets WHERE id LIKE '{}'".format(ticketid))
-        result = c.fetchall()
-        return str(result) 
+        c.execute("SELECT id, name, datelogged, device, details, phoneno FROM tickets WHERE id LIKE '{}'".format(ticketid))
+        result = c.fetchone()
+        print(result)
+        output = template('details', ticketno=result[0], name=result[1], date=result[2], device=result[3], details=result[4], phone=result[5])
+        return output
 
+@get('/closeticket/<ticketid>')
+def closeticket(ticketid):
+    loggedin = request.get_cookie("loggedin", secret="secretvalue")
+    if loggedin:
+        conn = sqlite3.connect('tickets.db')
+        c = conn.cursor()
+        c.execute("UPDATE tickets SET openstatus = false WHERE id LIKE '{}'".format(ticketid))
+        conn.commit()
+        redirect('/tickets')
+
+@get('/editticket/<ticketid>')
+def editticket(ticketid):
+    loggedin = request.get_cookie("loggedin", secret="secretvalue")
+    if loggedin: 
+        conn = sqlite3.connect('tickets.db')
+        c = conn.cursor()
+        c.execute("SELECT id, details, phoneno FROM tickets WHERE id LIKE '{}'".format(ticketid))
+        result = c.fetchone()
+        print(result)
+        output = template('edit', ticketno=result[0], details=result[1], phone=result[2])
+        return output
+
+@post('/editticket/<ticketid>')
+def getticket(ticketid):
+    ticketid = ticketid
+    details = request.forms.get('details')
+    conn = sqlite3.connect('tickets.db')
+    conn.execute("UPDATE tickets SET details = '{}' WHERE id LIKE '{}'".format(details, ticketid))
+    conn.commit()
+    redirect('/ticket/{}'.format(ticketid))
+#############################
 ### ADMIN UTILS ###
 @route('/closeserver')
 def auth():
@@ -406,20 +496,6 @@ def auth():
     else:
         return redirect('/')
 
-@route('/wipeuserdb')
-def wipe():
-    auth = isAdmin()
-    if auth == True:
-        os.remove('users.db')
-        connectdb()
-        db.execute('''CREATE TABLE USERS
-         (USERNAME          TEXT    NOT NULL,
-         PASSWORD          TEXT    NOT NULL,
-         ADMIN             BOOL    NOT NULL);''')
-        sleep(1)
-        db.execute("INSERT INTO USERS (username, password, admin) VALUES (admin, admin, True)")
-        return redirect('/')
-
 @route('/makeadmin')
 def makeadmin():
     user = request.get_cookie("loggedin", secret="secretvalue")
@@ -427,6 +503,7 @@ def makeadmin():
     key = randint(0000, 9999)
     print('Key = ', key)
     if input("TYPE KEY TO CONFIRM >> ") == str(key):
+        db = connect('users.db')
         db.execute("UPDATE USERS SET admin = True WHERE username = ?", (user,))
         db.commit()
         response.delete_cookie("loggedin", secret="secretvalue")

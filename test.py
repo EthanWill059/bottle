@@ -1,11 +1,15 @@
-import sqlite3
-import time
+list = [(3,), (4,)]
 
-time.sleep(2)
-db = sqlite3.connect('users.db')
-user = 'ethanw'
-#db.execute("UPDATE USERS SET admin = True WHERE username = ?", (user,))
-db.commit()
-cur = db.execute("SELECT admin FROM USERS WHERE username = ?", (user,))
-row = cur.fetchone()
-print(row[0])
+openids = list
+def listToString(s): 
+    
+    # initialize an empty string
+    str1 = " " 
+    
+    # return string  
+    return (str1.join(s))
+listToStr = listToString(openids)
+print(listToStr)
+listToStr = listToStr.replace('(),', "")
+listToStr.split()
+print(openids)
